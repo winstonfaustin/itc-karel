@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Karel the Robot - Level Puzzles</title>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css"
+    />
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      img {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #ff0000 0%, #28313b 100%);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      h1 {
+        color: white;
+        margin-bottom: 20px;
+        font-size: 2.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      .game-container {
+        display: flex;
+        gap: 25px;
+        align-items: flex-start;
+        justify-content: center;
+        width: 100%;
+        max-width: 1400px;
+      }
+      .grid-container,
+      .controls {
+        background: white;
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .grid-container {
+        width: 480px;
+        flex-shrink: 0;
+      }
+      .grid-title,
+      .controls h3 {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 20px;
+        color: #333;
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(8, 50px);
+        grid-template-rows: repeat(8, 50px);
+        gap: 2px;
+        background-color: #ccc;
+        border-radius: 12px;
+        padding: 8px;
+      }
+      .cell {
+        width: 50px;
+        height: 50px;
+        background-color: white;
+        border-radius: 6px;
+        position: relative;
+      }
+      .wall-north {
+        border-top: 4px solid #34495e;
+      }
+      .wall-east {
+        border-right: 4px solid #34495e;
+      }
+      .wall-south {
+        border-bottom: 4px solid #34495e;
+      }
+      .wall-west {
+        border-left: 4px solid #34495e;
+      }
+
+      .karel {
+        width: 35px;
+        height: 35px;
+        background: linear-gradient(45deg, #ff4757, #e84118);
+        border-radius: 50%;
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+        z-index: 10;
+        font-size: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .karel.north::after {
+        content: "↑";
+      }
+      .karel.east::after {
+        content: "→";
+      }
+      .karel.south::after {
+        content: "↓";
+      }
+      .karel.west::after {
+        content: "←";
+      }
+      .beeper {
+        width: 25px;
+        height: 25px;
+        background: linear-gradient(45deg, #00d4ff, #0099cc);
+        border-radius: 50%;
+        border: 3px solid white;
+        position: absolute;
+        z-index: 5;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .controls {
+        flex-grow: 1;
+        min-width: 350px;
+        display: flex;
+        flex-direction: column;
+      }
+      .CodeMirror {
+        border: 2px solid #ddd;
+        border-radius: 12px;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 16px;
+        margin-bottom: 15px;
+        resize: both;
+        min-height: 200px;
+        flex-grow: 1;
+        max-width: 100%;
+        max-height: 70vh;
+      }
+      .error-line {
+        background-color: #ffcccc !important;
+      }
+      button {
+        width: 100%;
+        padding: 15px;
+        margin: 5px 0;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+      }
+      #runButton {
+        background: linear-gradient(45deg, #2ed573, #1e90ff);
+      }
+      #runButton:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+      }
+      #resetButton {
+        background: linear-gradient(45deg, #ff7f50, #ff6348);
+      }
+      .status {
+        background: #f1f2f6;
+        color: #333;
+        padding: 15px;
+        border-radius: 12px;
+        margin-top: 15px;
+        font-weight: 600;
+        text-align: left;
+        overflow-wrap: break-word;
+        border-left: 5px solid #1e90ff;
+      }
+      .status.error {
+        border-left-color: #ff4757;
+        background-color: #ffcccc;
+        color: #c0392b;
+      }
+      .status.win {
+        border-left-color: #2ecc71;
+        background-color: #d4efdf;
+        color: #27ae60;
+      }
+      .info-panel {
+        display: flex;
+        justify-content: space-around;
+        background: #1e90ff;
+        color: white;
+        padding: 15px;
+        border-radius: 12px;
+        margin-top: 15px;
+      }
+      .info-item {
+        text-align: center;
+        font-size: 1rem;
+      }
+      .info-item .label {
+        font-size: 0.8rem;
+        opacity: 0.8;
+        margin-bottom: 2px;
+      }
+      .info-item .value {
+        font-weight: 700;
+        font-size: 1.2rem;
+      }
+      .speed-control {
+        margin: 10px 0;
+        text-align: center;
+        color: #333;
+      }
+      .speed-control label {
+        margin-right: 10px;
+        font-weight: 600;
+      }
+      .speed-control input[type="range"] {
+        width: 70%;
+        cursor: pointer;
+      }
+      .level-selector,
+      .level-objective {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 15px;
+      }
+      .level-selector h3,
+      .level-objective h4 {
+        text-align: center;
+        margin-top: 0;
+        color: #333;
+      }
+      .level-buttons {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .level-buttons button {
+        width: 100%;
+      }
+      .level-buttons .easy {
+        background-color: #2ecc71;
+      }
+      .level-buttons .medium {
+        background-color: #f39c12;
+      }
+      .level-buttons .hard {
+        background-color: #e74c3c;
+      }
+      .leaderboard {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        margin-top: 15px;
+      }
+      .leaderboard h4 {
+        text-align: center;
+        margin-top: 0;
+        color: #333;
+      }
+      .leaderboard ol {
+        list-style-type: decimal;
+        padding-left: 20px;
+      }
+      .leaderboard li {
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .leaderboard .score-time {
+        font-weight: bold;
+      }
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+      }
+      .modal-overlay.visible {
+        visibility: visible;
+        opacity: 1;
+      }
+      .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 20px;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      }
+      .modal-content h3 {
+        margin-top: 0;
+      }
+      .modal-content input {
+        width: 100%;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+      }
+      .modal-content button {
+        background-color: #2ecc71;
+      }
+      .modal-content .close-button {
+        background-color: #ccc;
+        color: #333;
+      }
+
+      @media (max-width: 880px) {
+        .game-container {
+          flex-direction: column;
+          align-items: center;
+        }
+        .controls {
+          width: 100%;
+          max-width: 480px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <img src="/ITCLOGO.jpeg" alt="" />
+    <h1>🤖 Karel the Robot: The Program</h1>
+
+    <div class="level-selector" style="width: 530px; max-width: 100%">
+      <h3>Select a Level</h3>
+      <div class="level-buttons">
+        <button class="easy" onclick="loadLevel('easy')">Easy</button>
+        <button class="medium" onclick="loadLevel('medium')">Medium</button>
+        <button class="hard" onclick="loadLevel('hard')">Hard</button>
+      </div>
+    </div>
+
+    <div class="game-container">
+      <div class="grid-container">
+        <div class="grid-title">Game World</div>
+        <div class="grid" id="grid"></div>
+        <div class="level-objective">
+          <h4>Objective</h4>
+          <p id="objectiveText"></p>
+        </div>
+        <div class="leaderboard">
+          <h4>🏆 Leaderboard</h4>
+          <ol id="leaderboard-list"></ol>
+        </div>
+      </div>
+
+      <div class="controls">
+        <h3>👨‍💻 Program</h3>
+
+        <div id="editor"></div>
+
+        <button id="runButton" onclick="runProgram()">▶️ Run Program</button>
+        <button id="resetButton" onclick="loadLevel(currentLevel)">
+          🔄 Reset Level
+        </button>
+
+        <div class="speed-control">
+          <label for="speedSlider">Speed</label>
+          <input
+            type="range"
+            min="50"
+            max="1000"
+            value="400"
+            id="speedSlider"
+          />
+        </div>
+
+        <div class="info-panel">
+          <div class="info-item">
+            <div class="label">BEEPERS</div>
+            <div class="value">💎 <span id="beeperCount">0</span></div>
+          </div>
+          <div class="info-item">
+            <div class="label">DIRECTION</div>
+            <div class="value">🧭 <span id="directionStatus"></span></div>
+          </div>
+          <div class="info-item">
+            <div class="label">TIME</div>
+            <div class="value">⏱️ <span id="timer">0m 0s</span></div>
+          </div>
+        </div>
+
+        <div class="status" id="status">Select a level to start.</div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="winModal">
+      <div class="modal-content">
+        <h3>Congratulations!</h3>
+        <p>You completed the level. Enter your name for the leaderboard!</p>
+        <input type="text" id="playerName" placeholder="Your Name" />
+        <button onclick="submitScore()">Submit Score</button>
+        <button class="close-button" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import {
+        getAuth,
+        signInAnonymously,
+      } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+      import {
+        getFirestore,
+        collection,
+        addDoc,
+        getDocs,
+        query,
+        orderBy,
+        limit,
+      } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyBuJbl3rsUyaTCnfrvGqEC2o7G92DK6i1k",
+        authDomain: "karel-leaderboard.firebaseapp.com",
+        projectId: "karel-leaderboard",
+        storageBucket: "karel-leaderboard.appspot.com",
+        messagingSenderId: "891394045426",
+        appId: "1:891394045426:web:cad6c8d8b511bbe862676b",
+      };
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        signInAnonymously(auth);
+
+        window.db = db;
+        window.firebase = {
+          collection,
+          addDoc,
+          getDocs,
+          query,
+          orderBy,
+          limit,
+        };
+      } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        window.db = null;
+      }
+
+      window.initGame();
+    </script>
+
+    <script>
+      const gridSize = 8;
+      let karel, grid, isRunning, editor, currentLevel;
+      let customFunctions = {};
+      let executionSpeed = 400;
+      let errorLineHandle = null;
+      let timerInterval = null;
+      let elapsedSeconds = 0;
+
+      const DEFAULT_CODE = `// You can define your own functions
+
+// Your program must be in a main() function
+function main() {
+    // Commands end in ();
+    move();
+}
+`;
+
+      const levels = {
+        easy: {
+          objective: "Collect all three beepers.",
+          startState: { x: 0, y: 7, direction: "east", beepers: 0 },
+          beepers: [
+            { x: 2, y: 1 },
+            { x: 4, y: 5 },
+            { x: 6, y: 7 },
+          ],
+          walls: [],
+          winCondition: (k, g) => g.flat().every((cell) => !cell.hasBeeper),
+        },
+        medium: {
+          objective:
+            "Define a 'jumpHurdle' function to get past the walls and pick up all the beepers.",
+          startState: { x: 0, y: 7, direction: "east", beepers: 0 },
+          beepers: [
+            { x: 3, y: 7 },
+            { x: 5, y: 7 },
+            { x: 7, y: 7 },
+          ],
+          walls: [
+            { x: 1, y: 7, side: "east" },
+            { x: 1, y: 6, side: "east" },
+            { x: 1, y: 5, side: "east" },
+            { x: 1, y: 4, side: "east" },
+            { x: 1, y: 3, side: "east" },
+            { x: 1, y: 2, side: "east" },
+            { x: 1, y: 1, side: "east" },
+            { x: 3, y: 7, side: "east" },
+            { x: 3, y: 6, side: "east" },
+            { x: 3, y: 5, side: "east" },
+            { x: 3, y: 4, side: "east" },
+            { x: 3, y: 3, side: "east" },
+            { x: 3, y: 2, side: "east" },
+            { x: 3, y: 1, side: "east" },
+            { x: 5, y: 7, side: "east" },
+            { x: 5, y: 6, side: "east" },
+            { x: 5, y: 5, side: "east" },
+            { x: 5, y: 4, side: "east" },
+            { x: 5, y: 3, side: "east" },
+            { x: 5, y: 2, side: "east" },
+            { x: 5, y: 1, side: "east" },
+          ],
+          winCondition: (k, g) => g.flat().every((cell) => !cell.hasBeeper),
+        },
+        hard: {
+          objective:
+            "Navigate the maze, pick up the single beeper, and move to the final destination at the bottom-right corner (7, 7).",
+          startState: { x: 0, y: 0, direction: "east", beepers: 0 },
+          beepers: [{ x: 1, y: 0 }],
+          walls: [
+            { x: 0, y: 0, side: "east" },
+            { x: 0, y: 1, side: "east" },
+            { x: 1, y: 2, side: "north" },
+            { x: 0, y: 3, side: "north" },
+            { x: 1, y: 3, side: "north" },
+            { x: 2, y: 2, side: "east" },
+            { x: 2, y: 1, side: "east" },
+            { x: 2, y: 0, side: "south" },
+            { x: 1, y: 0, side: "east" },
+            { x: 2, y: 3, side: "east" },
+            { x: 2, y: 4, side: "east" },
+          ],
+          winCondition: (k, g) => k.x === 7 && k.y === 7 && k.beepers === 1,
+        },
+      };
+      const conditions = {
+        frontIsClear: () => {
+          let newX = karel.x,
+            newY = karel.y;
+          const currentWalls = grid[karel.y][karel.x].walls;
+          if (
+            (karel.direction === "north" && currentWalls.north) ||
+            (karel.direction === "east" && currentWalls.east) ||
+            (karel.direction === "south" && currentWalls.south) ||
+            (karel.direction === "west" && currentWalls.west)
+          )
+            return false;
+          switch (karel.direction) {
+            case "north":
+              newY--;
+              break;
+            case "east":
+              newX++;
+              break;
+            case "south":
+              newY++;
+              break;
+            case "west":
+              newX--;
+              break;
+          }
+          return !(
+            newX < 0 ||
+            newX >= gridSize ||
+            newY < 0 ||
+            newY >= gridSize
+          );
+        },
+        frontIsBlocked: () => !conditions.frontIsClear(),
+        beepersPresent: () => grid[karel.y][karel.x].hasBeeper,
+        noBeepersPresent: () => !conditions.beepersPresent(),
+        beepersInBag: () => karel.beepers > 0,
+        noBeepersInBag: () => karel.beepers === 0,
+        facingNorth: () => karel.direction === "north",
+        notFacingNorth: () => karel.direction !== "north",
+        facingEast: () => karel.direction === "east",
+        notFacingEast: () => karel.direction !== "east",
+        facingSouth: () => karel.direction === "south",
+        notFacingSouth: () => karel.direction !== "south",
+        facingWest: () => karel.direction === "west",
+        notFacingWest: () => karel.direction !== "west",
+      };
+
+      function initGame() {
+        editor = CodeMirror(document.getElementById("editor"), {
+          value: DEFAULT_CODE,
+          lineNumbers: true,
+          mode: "text/plain",
+        });
+
+        const speedSlider = document.getElementById("speedSlider");
+        executionSpeed = 1050 - speedSlider.value;
+        speedSlider.addEventListener("input", (e) => {
+          executionSpeed = 1050 - e.target.value;
+        });
+
+        const gameGrid = document.getElementById("grid");
+        for (let row = 0; row < gridSize; row++) {
+          for (let col = 0; col < gridSize; col++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            cell.id = `cell-${col}-${row}`;
+            gameGrid.appendChild(cell);
+          }
+        }
+        loadLevel("easy");
+      }
+
+      function clearErrorHighlight() {
+        if (errorLineHandle) {
+          editor.removeLineClass(errorLineHandle, "background", "error-line");
+          errorLineHandle = null;
+        }
+      }
+      function highlightErrorLine(lineNumber) {
+        clearErrorHighlight();
+        errorLineHandle = editor.addLineClass(
+          lineNumber - 1,
+          "background",
+          "error-line"
+        );
+      }
+
+      // ADDED: Helper function to format time
+      function formatTime(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}m ${seconds}s`;
+      }
+
+      function startTimer() {
+        stopTimer();
+        timerInterval = setInterval(() => {
+          elapsedSeconds++;
+          document.getElementById("timer").textContent =
+            formatTime(elapsedSeconds);
+        }, 1000);
+      }
+
+      function stopTimer() {
+        clearInterval(timerInterval);
+      }
+
+      function resetTimer() {
+        stopTimer();
+        elapsedSeconds = 0;
+        document.getElementById("timer").textContent = "0m 0s";
+      }
+
+      function resetKarelState(levelName) {
+        const levelData = levels[levelName];
+        karel = { ...levelData.startState };
+        grid = Array(gridSize)
+          .fill(null)
+          .map(() =>
+            Array(gridSize)
+              .fill(null)
+              .map(() => ({ hasBeeper: false, walls: {} }))
+          );
+        levelData.beepers.forEach(
+          (pos) => (grid[pos.y][pos.x].hasBeeper = true)
+        );
+        levelData.walls.forEach((wall) => {
+          grid[wall.y][wall.x].walls[wall.side] = true;
+          if (wall.side === "north" && wall.y > 0)
+            grid[wall.y - 1][wall.x].walls.south = true;
+          if (wall.side === "south" && wall.y < gridSize - 1)
+            grid[wall.y + 1][wall.x].walls.north = true;
+          if (wall.side === "west" && wall.x > 0)
+            grid[wall.y][wall.x - 1].walls.east = true;
+          if (wall.side === "east" && wall.x < gridSize - 1)
+            grid[wall.y][wall.x + 1].walls.west = true;
+        });
+        updateDisplay();
+      }
+
+      async function fetchLeaderboard(levelName) {
+        const leaderboardList = document.getElementById("leaderboard-list");
+        leaderboardList.innerHTML = "<li>Loading...</li>";
+
+        if (!window.db) {
+          leaderboardList.innerHTML = "<li>Leaderboard not available.</li>";
+          return;
+        }
+
+        const { collection, query, orderBy, limit, getDocs } = window.firebase;
+        const scoresRef = collection(window.db, "scores", levelName, "entries");
+        const q = query(scoresRef, orderBy("time"), limit(5));
+
+        try {
+          const querySnapshot = await getDocs(q);
+          leaderboardList.innerHTML = "";
+          if (querySnapshot.empty) {
+            leaderboardList.innerHTML = "<li>No scores yet. Be the first!</li>";
+          } else {
+            querySnapshot.forEach((doc) => {
+              const data = doc.data();
+              const li = document.createElement("li");
+              li.innerHTML = `<span>${
+                data.name
+              }</span> <span class="score-time">${formatTime(
+                data.time
+              )}</span>`;
+              leaderboardList.appendChild(li);
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching leaderboard: ", error);
+          leaderboardList.innerHTML = "<li>Could not load scores.</li>";
+        }
+      }
+
+      function loadLevel(levelName) {
+        if (isRunning) return;
+        stopTimer();
+        clearErrorHighlight();
+
+        currentLevel = levelName;
+        const levelData = levels[levelName];
+        resetKarelState(levelName);
+
+        document.getElementById("objectiveText").textContent =
+          levelData.objective;
+        setStatus(`🚀 Level "${levelName}" loaded. Start writing your code!`);
+        document.getElementById("runButton").disabled = false;
+
+        resetTimer();
+        startTimer();
+        fetchLeaderboard(levelName);
+      }
+
+      function updateDisplay() {
+        for (let row = 0; row < gridSize; row++) {
+          for (let col = 0; col < gridSize; col++) {
+            const cell = document.getElementById(`cell-${col}-${row}`);
+            cell.innerHTML = "";
+            cell.className = "cell";
+            const cellData = grid[row][col];
+            if (cellData.hasBeeper) {
+              const beeper = document.createElement("div");
+              beeper.className = "beeper";
+              cell.appendChild(beeper);
+            }
+            for (const side in cellData.walls) {
+              if (cellData.walls[side]) cell.classList.add(`wall-${side}`);
+            }
+          }
+        }
+        const karelCell = document.getElementById(`cell-${karel.x}-${karel.y}`);
+        if (karelCell) {
+          const karelElement = document.createElement("div");
+          karelElement.className = `karel ${karel.direction}`;
+          karelCell.appendChild(karelElement);
+        }
+        document.getElementById("beeperCount").textContent = karel.beepers;
+        document.getElementById("directionStatus").textContent =
+          karel.direction.charAt(0).toUpperCase() + karel.direction.slice(1);
+      }
+
+      function setStatus(message, type = "info") {
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = message;
+        statusEl.className = "status";
+        if (type === "error") statusEl.classList.add("error");
+        if (type === "win") statusEl.classList.add("win");
+      }
+
+      function move() {
+        if (!conditions.frontIsClear()) {
+          return {
+            success: false,
+            message: "🚫 CRASH! Karel hit a wall or the edge of the world.",
+          };
+        }
+        let newX = karel.x,
+          newY = karel.y;
+        switch (karel.direction) {
+          case "north":
+            newY--;
+            break;
+          case "east":
+            newX++;
+            break;
+          case "south":
+            newY++;
+            break;
+          case "west":
+            newX--;
+            break;
+        }
+        karel.x = newX;
+        karel.y = newY;
+        updateDisplay();
+        return { success: true };
+      }
+      function turnLeft() {
+        karel.direction = {
+          north: "west",
+          west: "south",
+          south: "east",
+          east: "north",
+        }[karel.direction];
+        updateDisplay();
+        return { success: true };
+      }
+      function pickBeeper() {
+        if (conditions.beepersPresent()) {
+          grid[karel.y][karel.x].hasBeeper = false;
+          karel.beepers++;
+          updateDisplay();
+          return { success: true };
+        }
+        return { success: false, message: "❌ No beeper to pick up." };
+      }
+      function putBeeper() {
+        if (conditions.beepersInBag()) {
+          if (conditions.noBeepersPresent()) {
+            grid[karel.y][karel.x].hasBeeper = true;
+            karel.beepers--;
+            updateDisplay();
+            return { success: true };
+          }
+          return {
+            success: false,
+            message: "⚠️ There is already a beeper here.",
+          };
+        }
+        return { success: false, message: "🚫 No beepers in the bag to put." };
+      }
+
+      function parseCode(lines) {
+        let functions = {};
+        let main = [];
+        let structureStack = [main];
+        const functionDefRegex = /function\s+(\w+)\s*\(\)\s*\{/;
+        const ifRegex = /if\s*\((.*)\)\s*\{/;
+        const forRegex = /for\s*\((\d+)\)\s*\{/;
+        const whileRegex = /while\s*\((.*)\)\s*\{/;
+
+        for (let i = 0; i < lines.length; i++) {
+          const originalLine = lines[i];
+          const lineWithoutComment = originalLine.split("//")[0];
+          const trimmedLine = lineWithoutComment.trim();
+          const lineNumber = i + 1;
+
+          if (!trimmedLine) continue;
+
+          const functionMatch = trimmedLine.match(functionDefRegex);
+          const ifMatch = trimmedLine.match(ifRegex);
+          const forMatch = trimmedLine.match(forRegex);
+          const whileMatch = trimmedLine.match(whileRegex);
+          const elseMatch = trimmedLine.match(/^}\s*else\s*\{/);
+
+          if (trimmedLine.startsWith("}")) {
+            const lastBlock = structureStack.pop();
+            if (structureStack.length === 0)
+              throw new Error(`Line ${lineNumber}: Unmatched "}"`);
+
+            if (elseMatch) {
+              const parentIf =
+                structureStack[structureStack.length - 1].slice(-1)[0];
+              if (!parentIf || parentIf.type !== "if")
+                throw new Error(`Line ${lineNumber}: Unexpected "else"`);
+              structureStack.push(parentIf.elseBranch);
+            }
+          } else if (functionMatch || ifMatch || forMatch || whileMatch) {
+            if (functionMatch) {
+              const name = functionMatch[1];
+              const funcNode = {
+                type: "function",
+                name,
+                body: [],
+                line: lineNumber,
+              };
+              functions[name] = funcNode;
+              structureStack.push(funcNode.body);
+            } else if (ifMatch) {
+              const innerCondition = ifMatch[1].trim();
+              if (!innerCondition.endsWith("()")) {
+                throw new Error(
+                  `Line ${lineNumber}: Syntax Error. Conditions in if() statements must be followed by parentheses ().`
+                );
+              }
+              const condition = innerCondition.replace(/\(\)/, "").trim();
+              const ifNode = {
+                type: "if",
+                condition,
+                thenBranch: [],
+                elseBranch: [],
+                line: lineNumber,
+              };
+              structureStack[structureStack.length - 1].push(ifNode);
+              structureStack.push(ifNode.thenBranch);
+            } else if (forMatch) {
+              const count = parseInt(forMatch[1], 10);
+              const forNode = {
+                type: "for",
+                count,
+                body: [],
+                line: lineNumber,
+              };
+              structureStack[structureStack.length - 1].push(forNode);
+              structureStack.push(forNode.body);
+            } else if (whileMatch) {
+              const innerCondition = whileMatch[1].trim();
+              if (!innerCondition.endsWith("()")) {
+                throw new Error(
+                  `Line ${lineNumber}: Syntax Error. Conditions in while() statements must be followed by parentheses ().`
+                );
+              }
+              const condition = innerCondition.replace(/\(\)/, "").trim();
+              const whileNode = {
+                type: "while",
+                condition,
+                body: [],
+                line: lineNumber,
+              };
+              structureStack[structureStack.length - 1].push(whileNode);
+              structureStack.push(whileNode.body);
+            }
+          } else {
+            if (!trimmedLine.endsWith(";")) {
+              throw new Error(
+                `Line ${lineNumber}: Syntax Error. Commands must end with a semicolon (;).`
+              );
+            }
+            const commandWithoutSemicolon = trimmedLine.slice(0, -1).trim();
+            if (!commandWithoutSemicolon.endsWith("()")) {
+              throw new Error(
+                `Line ${lineNumber}: Syntax Error. Commands must be followed by parentheses ().`
+              );
+            }
+
+            structureStack[structureStack.length - 1].push({
+              type: "command",
+              command: trimmedLine,
+              line: lineNumber,
+            });
+          }
+        }
+
+        if (structureStack.length !== 1)
+          throw new Error("Mismatched curly braces { } in your code.");
+
+        const mainExecutionCmds = functions["main"]
+          ? functions["main"].body
+          : [];
+        delete functions["main"];
+        return { functions, main: mainExecutionCmds };
+      }
+
+      function runProgram() {
+        if (isRunning) return;
+        clearErrorHighlight();
+        resetKarelState(currentLevel);
+
+        const code = editor.getValue();
+        try {
+          const programStructure = parseCode(code.split(/\r?\n/));
+          const mainExecutionCmds = programStructure.main;
+          customFunctions = programStructure.functions;
+
+          if (mainExecutionCmds.length === 0) {
+            setStatus(
+              "Could not find a main() function to run. Please put your code inside a 'function main() { ... }' block.",
+              "error"
+            );
+            return;
+          }
+          isRunning = true;
+          document.getElementById("runButton").disabled = true;
+          setStatus("Running program...");
+          setTimeout(() => {
+            executeStep([...mainExecutionCmds]);
+          }, executionSpeed);
+        } catch (e) {
+          setStatus(e.message, "error");
+          const match = e.message.match(/Line (\d+):/);
+          if (match && match[1]) {
+            highlightErrorLine(parseInt(match[1]));
+          }
+        }
+      }
+
+      function executeStep(commandItems) {
+        if (commandItems.length === 0) {
+          if (!checkWinCondition()) {
+            setStatus("Program finished, but the objective isn't complete.");
+          }
+          isRunning = false;
+          document.getElementById("runButton").disabled = false;
+          return;
+        }
+
+        const item = commandItems.shift();
+
+        if (item.type === "if") {
+          const conditionFunc = conditions[item.condition];
+          if (conditionFunc) {
+            const branchToExecute = conditionFunc()
+              ? item.thenBranch
+              : item.elseBranch;
+            commandItems.unshift(...branchToExecute);
+          } else {
+            setStatus(
+              `Line ${item.line}: Unknown condition "${item.condition}()"`,
+              "error"
+            );
+            highlightErrorLine(item.line);
+            isRunning = false;
+            document.getElementById("runButton").disabled = false;
+            return;
+          }
+          executeStep(commandItems);
+          return;
+        }
+
+        if (item.type === "for") {
+          const expandedBody = [];
+          for (let i = 0; i < item.count; i++) {
+            expandedBody.push(...JSON.parse(JSON.stringify(item.body)));
+          }
+          commandItems.unshift(...expandedBody);
+          executeStep(commandItems);
+          return;
+        }
+
+        if (item.type === "while") {
+          const conditionFunc = conditions[item.condition];
+          if (conditionFunc) {
+            if (conditionFunc()) {
+              commandItems.unshift(JSON.parse(JSON.stringify(item)));
+              commandItems.unshift(...JSON.parse(JSON.stringify(item.body)));
+            }
+          } else {
+            setStatus(
+              `Line ${item.line}: Unknown condition "${item.condition}()"`,
+              "error"
+            );
+            highlightErrorLine(item.line);
+            isRunning = false;
+            document.getElementById("runButton").disabled = false;
+            return;
+          }
+          executeStep(commandItems);
+          return;
+        }
+
+        const cleanCommand = item.command
+          .replace(";", "")
+          .replace(/\(\s*\)/, "")
+          .trim();
+
+        let result = {
+          success: false,
+          message: `❌ Unknown command: "${item.command}"`,
+        };
+        let commandHandled = false;
+
+        switch (cleanCommand) {
+          case "move":
+            result = move();
+            commandHandled = true;
+            break;
+          case "turnLeft":
+            result = turnLeft();
+            commandHandled = true;
+            break;
+          case "pickBeeper":
+            result = pickBeeper();
+            commandHandled = true;
+            break;
+          case "putBeeper":
+            result = putBeeper();
+            commandHandled = true;
+            break;
+        }
+
+        if (commandHandled) {
+          if (result.success) {
+            if (checkWinCondition()) {
+              stopTimer();
+              isRunning = false;
+              document.getElementById("runButton").disabled = false;
+            } else {
+              setTimeout(() => executeStep(commandItems), executionSpeed);
+            }
+          } else {
+            setStatus(`Line ${item.line}: ${result.message}`, "error");
+            highlightErrorLine(item.line);
+            isRunning = false;
+            document.getElementById("runButton").disabled = false;
+          }
+        } else if (customFunctions[cleanCommand]) {
+          const functionBody = JSON.parse(
+            JSON.stringify(customFunctions[cleanCommand].body)
+          );
+          commandItems.unshift(...functionBody);
+          executeStep(commandItems);
+        } else {
+          setStatus(`Line ${item.line}: ${result.message}`, "error");
+          highlightErrorLine(item.line);
+          isRunning = false;
+          document.getElementById("runButton").disabled = false;
+        }
+      }
+
+      function checkWinCondition() {
+        const levelData = levels[currentLevel];
+        if (levelData.winCondition(karel, grid)) {
+          setStatus(
+            `🏆 Congratulations! You completed level "${currentLevel}"!`,
+            "win"
+          );
+          document.getElementById("winModal").classList.add("visible");
+          return true;
+        }
+        return false;
+      }
+
+      async function submitScore() {
+        const playerNameInput = document.getElementById("playerName");
+        const playerName = playerNameInput.value.trim();
+        if (!playerName) {
+          setStatus("Please enter a name.", "error");
+          return;
+        }
+        if (!window.db) {
+          setStatus("Leaderboard service is not available.", "error");
+          return;
+        }
+
+        const userCode = editor.getValue().split("\n");
+
+        const { collection, addDoc } = window.firebase;
+        try {
+          await addDoc(
+            collection(window.db, "scores", currentLevel, "entries"),
+            {
+              name: playerName,
+              time: elapsedSeconds,
+              code: userCode,
+              createdAt: new Date(),
+            }
+          );
+          playerNameInput.value = "";
+          closeModal();
+          editor.setValue(DEFAULT_CODE);
+          loadLevel(currentLevel);
+        } catch (error) {
+          console.error("Error adding document: ", error);
+          setStatus("Could not submit score.", "error");
+        }
+      }
+
+      function closeModal() {
+        document.getElementById("winModal").classList.remove("visible");
+      }
+
+      // Make functions callable from HTML onclick attributes
+      window.loadLevel = loadLevel;
+      window.runProgram = runProgram;
+      window.submitScore = submitScore;
+      window.closeModal = closeModal;
+      window.initGame = initGame;
+    </script>
+  </body>
+</html>
